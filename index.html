@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Filredigerare</title>
+    <link href="https://unpkg.com/tabulator-tables@5.4.4/dist/css/tabulator.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/tabulator-tables@5.4.4/dist/js/tabulator.min.js"></script>
+</head>
+<body>
+    <h2>Ladda upp en fil</h2>
+    <input type="file" id="fileInput">
+    <button onclick="downloadFile()">Ladda ner ändrad fil</button>
+    <div id="table"></div>
+
+    <script>
+        let table;
+        let originalData = [];
+
+        document.getElementById('fileInput').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    parseFile(e.target.result);
+                };
+                reader.readAsText(file);
+            }
+        });
+
+        function parseFile(content) {
+            const lines = content.split('\n').filter(line => line.trim() !== "");
+            originalData = lines.map(line => {
+                const parts = line.split('|');
+                let obj = { original: line };
+                parts.forEach(part => {
+                    if (part.includes('Name=')) {
+                        obj.type = parts[1];
+                        obj.name = part.split('=')[1];
+                    }
+                });
+                return obj;
+            }).filter(item => item.name);
+
+            renderTable();
+        }
+
+        function renderTable() {
+            table = new Tabulator("#table", {
+                data: originalData,
+                layout: "fitColumns",
+                columns: [
+                    { title: "Typ", field: "type", width: 150 },
+                    { title: "Namn", field: "name", editor: "input" }
+                ]
+            });
+        }
+
+        function downloadFile() {
+            const updatedData = table.getData().map(row => {
+                return row.original.replace(/Name=[^|]*/, `Name=${row.name}`);
+            }).join('\n');
+
+            const blob = new Blob([updatedData], { type: "text/plain" });
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = "updated_file.txt";
+            a.click();
+        }
+    </script>
+</body>
+</html>

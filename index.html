@@ -10,19 +10,26 @@
 <body>
     <h2>Ladda upp en fil</h2>
     <input type="file" id="fileInput">
-    <button onclick="downloadFile()">Ladda ner ändrad fil</button>
+    <h3>Välj sektion att justera</h3>
+    <select id="sectionSelect" onchange="filterRows()"></select>
+    <h3>Välj rader att justera</h3>
+    <select id="rowSelect" multiple onchange="filterSeats()"></select>
     <div id="table"></div>
+    <button onclick="downloadFile()">Ladda ner ändrad fil</button>
 
     <script>
         let table;
         let originalData = [];
+        let filteredData = [];
+        let fileContent = "";
 
         document.getElementById('fileInput').addEventListener('change', function(event) {
             const file = event.target.files[0];
             if (file) {
                 const reader = new FileReader();
                 reader.onload = function(e) {
-                    parseFile(e.target.result);
+                    fileContent = e.target.result;
+                    parseFile(fileContent);
                 };
                 reader.readAsText(file);
             }
@@ -32,40 +39,84 @@
             const lines = content.split('\n').filter(line => line.trim() !== "");
             originalData = lines.map(line => {
                 const parts = line.split('|');
-                let obj = { original: line };
+                let obj = { original: line, type: parts[1], name: "", id: "" };
+                
                 parts.forEach(part => {
-                    if (part.includes('Name=')) {
-                        obj.type = parts[1];
+                    if (part.startsWith('Name=')) {
                         obj.name = part.split('=')[1];
                     }
+                    if (part.startsWith('SectionId=') || part.startsWith('RowId=') || part.startsWith('SeatId=')) {
+                        obj.id = part.split('=')[1];
+                    }
                 });
-                return obj;
-            }).filter(item => item.name);
+                
+                return obj.name ? obj : null;
+            }).filter(item => item);
 
+            populateSections();
+        }
+
+        function populateSections() {
+            const sectionSelect = document.getElementById("sectionSelect");
+            sectionSelect.innerHTML = "<option value=''>-- Välj sektion --</option>";
+            
+            let sections = originalData.filter(item => item.type === 'SectionAdd');
+            sections.forEach(section => {
+                let option = document.createElement("option");
+                option.value = section.id;
+                option.textContent = section.name;
+                sectionSelect.appendChild(option);
+            });
+        }
+
+        function filterRows() {
+            const selectedSection = document.getElementById("sectionSelect").value;
+            const rowSelect = document.getElementById("rowSelect");
+            rowSelect.innerHTML = "";
+            
+            let rows = originalData.filter(item => item.type === 'RowAdd' && item.id.startsWith(selectedSection));
+            rows.forEach(row => {
+                let option = document.createElement("option");
+                option.value = row.id;
+                option.textContent = row.name;
+                rowSelect.appendChild(option);
+            });
+        }
+
+        function filterSeats() {
+            const selectedRows = Array.from(document.getElementById("rowSelect").selectedOptions).map(option => option.value);
+            filteredData = originalData.filter(item => selectedRows.some(row => item.id.startsWith(row)));
             renderTable();
         }
 
         function renderTable() {
             table = new Tabulator("#table", {
-                data: originalData,
+                data: filteredData,
                 layout: "fitColumns",
                 columns: [
                     { title: "Typ", field: "type", width: 150 },
+                    { title: "ID", field: "id", width: 150 },
                     { title: "Namn", field: "name", editor: "input" }
                 ]
             });
         }
 
         function downloadFile() {
-            const updatedData = table.getData().map(row => {
-                return row.original.replace(/Name=[^|]*/, `Name=${row.name}`);
+            let updatedData = fileContent.split('\n').map(line => {
+                let modifiedRow = table.getData().find(row => line.includes(row.id));
+                if (modifiedRow) {
+                    return line.replace(/Name=[^|]*/, `Name=${modifiedRow.name}`);
+                }
+                return line;
             }).join('\n');
 
             const blob = new Blob([updatedData], { type: "text/plain" });
             const a = document.createElement("a");
             a.href = URL.createObjectURL(blob);
             a.download = "updated_file.txt";
+            document.body.appendChild(a);
             a.click();
+            document.body.removeChild(a);
         }
     </script>
 </body>

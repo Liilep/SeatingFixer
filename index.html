@@ -20,7 +20,6 @@
     <script>
         let table;
         let originalData = [];
-        let filteredData = [];
         let fileContent = "";
 
         document.getElementById('fileInput').addEventListener('change', function(event) {
@@ -85,13 +84,13 @@
 
         function filterSeats() {
             const selectedRows = Array.from(document.getElementById("rowSelect").selectedOptions).map(option => option.value);
-            filteredData = originalData.filter(item => selectedRows.some(row => item.id.startsWith(row)));
-            renderTable();
+            let filteredData = originalData.filter(item => selectedRows.some(row => item.id.startsWith(row)));
+            renderTable(filteredData);
         }
 
-        function renderTable() {
+        function renderTable(data) {
             table = new Tabulator("#table", {
-                data: filteredData,
+                data: data,
                 layout: "fitColumns",
                 columns: [
                     { title: "Typ", field: "type", width: 150 },
@@ -105,7 +104,7 @@
             let updatedData = fileContent.split('\n').map(line => {
                 let modifiedRow = table.getData().find(row => line.includes(row.id));
                 if (modifiedRow) {
-                    return line.replace(/Name=[^|]*/, `Name=${modifiedRow.name}`);
+                    return line.replace(/(Name=)[^|]*/, `$1${modifiedRow.name}`);
                 }
                 return line;
             }).join('\n');
